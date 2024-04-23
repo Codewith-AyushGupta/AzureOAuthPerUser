@@ -1,0 +1,53 @@
+#r "Newtonsoft.Json"
+
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+using System.Text;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Primitives;
+using Newtonsoft.Json;
+
+public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
+{
+  log.LogInformation("C# HTTP trigger function processed a request.");
+
+  string accessToken = req.Headers["accessToken"];
+   
+  string endPoint = req.Headers["endPoint"];
+  log.LogInformation($"accessToken {accessToken}");
+  log.LogInformation($"endPoint {endPoint}");
+  log.LogInformation("C# HTTP trigger function processed a request.");
+  string responseMessage;
+  if (!string.IsNullOrEmpty(accessToken) && !string.IsNullOrEmpty(endPoint))
+  {
+    try
+    {
+      using (var httpClient = new HttpClient())
+      {
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Authorization", $"Bearer {accessToken}");
+        string url = $"https://api.spotify.com/{endPoint}"; // Construct the complete URL with endpoint
+
+        // Handle request body if needed (POST, PUT)
+        HttpResponseMessage httpResponse;
+        httpResponse = await httpClient.GetAsync(url);
+        httpResponse.EnsureSuccessStatusCode(); // Check for successful response
+        string responseContent = await httpResponse.Content.ReadAsStringAsync();
+        dynamic apiResponse = JsonConvert.DeserializeObject(responseContent);
+        responseMessage = $"API call successful. Response: {apiResponse}";
+        log.LogInformation(responseMessage);
+        return new OkObjectResult(apiResponse);
+      }
+    }
+    catch (Exception ex)
+    {
+      responseMessage = $"API call failed: {ex.Message}";
+    }
+  }
+  else
+  {
+    responseMessage = "Missing access code or endpoint in headers.";
+  }
+
+  return new OkObjectResult(responseMessage); 
+}

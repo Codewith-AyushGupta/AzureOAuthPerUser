@@ -1,0 +1,83 @@
+#r "Newtonsoft.Json"
+
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+
+public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
+{
+    log.LogInformation("C# HTTP trigger function processed a request.");
+    string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+    log.LogInformation($"C# HTTP trigger function processed a request body {requestBody}");
+    dynamic data = JsonConvert.DeserializeObject(requestBody);
+    log.LogInformation($"Deserialized Data {data}");
+    string code = data?.accesscode;
+    string redirectUri = "http://localhost:8181/";
+    string clientId = Environment.GetEnvironmentVariable("AzueClientId");
+    string clientSecret = Environment.GetEnvironmentVariable("AzueClientSecret");
+    string tokenUrl = "https://accounts.spotify.com/api/token";
+
+    log.LogInformation($"Accesscode ==> {code}");
+    log.LogInformation($"redirectUri ==> {redirectUri}");
+    log.LogInformation($"clientId ==> {clientId}");
+    log.LogInformation($"clientSecret ==> {clientSecret}");
+    log.LogInformation($"clientSecret ==> {clientSecret}");
+    string accessToken = await GetAccessToken(code, redirectUri, clientId, clientSecret, tokenUrl, log);
+    if (accessToken != null)
+    {
+        return new OkObjectResult(new { access_token = accessToken });
+    }
+    else
+    {
+        return new BadRequestObjectResult("Failed to retrieve access token.");
+    }
+}
+
+public static async Task<string> GetAccessToken(string code, string redirectUri, string clientId, string clientSecret, string tokenUrl, ILogger log)
+{
+    var authHeader = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
+
+    var formData = new Dictionary<string, string>
+    {
+        { "code", code },
+        { "redirect_uri", redirectUri },
+        { "grant_type", "authorization_code" }
+    };
+
+    using (var client = new HttpClient())
+    {
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authHeader);
+
+        var formContent = new FormUrlEncodedContent(formData);
+        var response = await client.PostAsync(tokenUrl, formContent);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var tokenData = await response.Content.ReadAsStringAsync();
+            log.LogInformation("Token data: {tokenData}", tokenData); // Log without sensitive info
+
+            try
+            {
+                var tokenResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(tokenData);
+                return tokenResponse["access_token"]; // Assuming access_token is a property name
+            }
+            catch (Exception ex)
+            {
+                log.LogError("Error parsing token response: {ex}", ex.Message);
+                return null; // Or return a more specific error message
+            }
+        }
+        else
+        {
+            var errorMessage = await response.Content.ReadAsStringAsync();
+            log.LogError("Error retrieving access token: {errorMessage}", errorMessage);
+            return null; // Or return a more specific error message
+        }
+    }
+}

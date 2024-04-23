@@ -1,0 +1,32 @@
+#r "Newtonsoft.Json"
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+
+public static async Task<IActionResult> Run(HttpRequest req, ILogger log)
+{
+    log.LogInformation("C# HTTP trigger function processed a request.");
+
+    // Accessing environment variables
+    string clientId = Environment.GetEnvironmentVariable("AzueClientId");
+    string clientSecret = Environment.GetEnvironmentVariable("AzueClientSecret");
+
+    log.LogInformation($"ClientId: {clientId}");
+    log.LogInformation($"clientSecret: {clientSecret}");
+
+    // Create a JSON object to return
+    var clientInfo = new {
+        ClientId = clientId,
+        ClientSecret = clientSecret
+    };
+
+    string responseMessage = string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret)
+        ? "This HTTP triggered function executed successfully. Pass client ID and client secret as environment variables for a personalized response."
+        : JsonConvert.SerializeObject(clientInfo);
+
+    return new OkObjectResult(responseMessage);
+}
